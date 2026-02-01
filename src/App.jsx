@@ -9,29 +9,9 @@ import {
   Save, Search, Edit, X
 } from 'lucide-react';
 
-// --- Types ---
-
-type AssetType = 'tw_stock' | 'us_stock' | 'tw_cash' | 'us_cash';
-
-interface AssetRecord {
-  id: string;
-  date: string;
-  type: AssetType;
-  amount: number; // 原幣金額
-  exchangeRate: number; // 匯率 (台幣為 1)
-  note: string;
-}
-
-interface ContributionRecord {
-  id: string;
-  person: 'A_Ru' | 'A_Hui';
-  date: string;
-  amount: number; // 台幣
-}
-
 // --- Constants & Helpers ---
 
-const ASSET_LABELS: Record<AssetType, string> = {
+const ASSET_LABELS = {
   tw_stock: '台股',
   us_stock: '美股',
   tw_cash: '台幣現金',
@@ -59,17 +39,17 @@ const YEARS = ['2024', '2025', '2026', '2027'];
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 // 格式化金額
-const formatCurrency = (val: number) => 
+const formatCurrency = (val) => 
   new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(val);
 
 // --- Main Component ---
 
 export default function InvestmentTracker() {
   // --- State ---
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'assets' | 'contributions'>('dashboard');
+  const [activeTab, setActiveTab] = useState('dashboard');
   
   // 初始範例資料 (根據使用者需求更新)
-  const [assets, setAssets] = useState<AssetRecord[]>(() => {
+  const [assets, setAssets] = useState(() => {
     const saved = localStorage.getItem('inv_assets');
     // 如果沒有存檔，使用使用者指定的新預設資料
     if (!saved) {
@@ -85,7 +65,7 @@ export default function InvestmentTracker() {
     return JSON.parse(saved);
   });
 
-  const [contributions, setContributions] = useState<ContributionRecord[]>(() => {
+  const [contributions, setContributions] = useState(() => {
     const saved = localStorage.getItem('inv_contributions');
     // 如果沒有存檔，使用使用者指定的新預設資料
     if (!saved) {
@@ -109,10 +89,10 @@ export default function InvestmentTracker() {
   
   // 取得每個類別"最新"的一筆記錄
   const currentStatus = useMemo(() => {
-    const status: Record<AssetType, number> = { tw_stock: 0, us_stock: 0, tw_cash: 0, us_cash: 0 };
+    const status = { tw_stock: 0, us_stock: 0, tw_cash: 0, us_cash: 0 };
     
     // 對每個類別，找到日期最新的一筆
-    (Object.keys(ASSET_LABELS) as AssetType[]).forEach(type => {
+    Object.keys(ASSET_LABELS).forEach(type => {
       const recordsOfType = assets.filter(a => a.type === type);
       if (recordsOfType.length > 0) {
         // 排序：日期新 -> 舊
@@ -136,8 +116,8 @@ export default function InvestmentTracker() {
   // --- Dashboard Logic: Timeline & Growth ---
 
   const [chartPeriod, setChartPeriod] = useState('all');
-  const [chartMode, setChartMode] = useState<'total' | 'investment'>('total'); // 總資產 or 投資部位(股)
-  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [chartMode, setChartMode] = useState('total'); // 總資產 or 投資部位(股)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
 
   // 建立歷史曲線數據 (Fill-Forward Logic)
   const timelineData = useMemo(() => {
@@ -155,7 +135,7 @@ export default function InvestmentTracker() {
       let usCashVal = 0;
 
       // 對於每個類別，找到 <= currentMoment 的最新一筆
-      (['tw_stock', 'us_stock', 'tw_cash', 'us_cash'] as AssetType[]).forEach(type => {
+      ['tw_stock', 'us_stock', 'tw_cash', 'us_cash'].forEach(type => {
         const relevantRecords = assets.filter(a => a.type === type && new Date(a.date).getTime() <= currentMoment);
         if (relevantRecords.length > 0) {
           relevantRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -197,7 +177,7 @@ export default function InvestmentTracker() {
   }, [timelineData, chartPeriod]);
 
   // Growth Calculation (Trailing Periods)
-  const calculateTrailingGrowth = (months: number, mode: 'total' | 'investment') => {
+  const calculateTrailingGrowth = (months, mode) => {
     if (timelineData.length < 2) return null;
     
     const lastPoint = timelineData[timelineData.length - 1];
@@ -226,7 +206,7 @@ export default function InvestmentTracker() {
   };
 
   // Annual Growth Calculation (Selected Year)
-  const calculateAnnualGrowth = (year: string) => {
+  const calculateAnnualGrowth = (year) => {
     if (timelineData.length === 0) return { growth: null, startVal: 0, endVal: 0 };
 
     // 定義該年度的範圍
@@ -265,7 +245,7 @@ export default function InvestmentTracker() {
   const annualStats = calculateAnnualGrowth(selectedYear);
 
   // --- Input Forms State ---
-  const [newAsset, setNewAsset] = useState<Partial<AssetRecord>>({
+  const [newAsset, setNewAsset] = useState({
     date: new Date().toISOString().split('T')[0],
     type: 'tw_stock',
     exchangeRate: 1,
@@ -274,9 +254,9 @@ export default function InvestmentTracker() {
   });
 
   // 新增編輯狀態
-  const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
+  const [editingAssetId, setEditingAssetId] = useState(null);
 
-  const [newContribution, setNewContribution] = useState<Partial<ContributionRecord>>({
+  const [newContribution, setNewContribution] = useState({
     date: new Date().toISOString().split('T')[0],
     person: 'A_Ru',
     amount: 0
@@ -292,8 +272,8 @@ export default function InvestmentTracker() {
       // 更新現有記錄
       setAssets(assets.map(a => a.id === editingAssetId ? {
         ...a,
-        date: newAsset.date!,
-        type: newAsset.type as AssetType,
+        date: newAsset.date,
+        type: newAsset.type,
         amount: Number(newAsset.amount),
         exchangeRate: (newAsset.type === 'us_stock' || newAsset.type === 'us_cash') ? Number(newAsset.exchangeRate) : 1,
         note: newAsset.note || ''
@@ -302,10 +282,10 @@ export default function InvestmentTracker() {
       alert('已更新資產記錄');
     } else {
       // 新增記錄
-      const record: AssetRecord = {
+      const record = {
         id: generateId(),
-        date: newAsset.date!,
-        type: newAsset.type as AssetType,
+        date: newAsset.date,
+        type: newAsset.type,
         amount: Number(newAsset.amount),
         exchangeRate: (newAsset.type === 'us_stock' || newAsset.type === 'us_cash') ? Number(newAsset.exchangeRate) : 1,
         note: newAsset.note || ''
@@ -324,7 +304,7 @@ export default function InvestmentTracker() {
     });
   };
 
-  const handleEditAsset = (record: AssetRecord) => {
+  const handleEditAsset = (record) => {
     setEditingAssetId(record.id);
     setNewAsset({
       date: record.date,
@@ -350,10 +330,10 @@ export default function InvestmentTracker() {
 
   const handleAddContribution = () => {
     if (!newContribution.amount || !newContribution.date) return;
-    const record: ContributionRecord = {
+    const record = {
       id: generateId(),
-      person: newContribution.person as 'A_Ru' | 'A_Hui',
-      date: newContribution.date!,
+      person: newContribution.person,
+      date: newContribution.date,
       amount: Number(newContribution.amount)
     };
     setContributions([...contributions, record]);
@@ -361,7 +341,7 @@ export default function InvestmentTracker() {
     alert('已新增投入記錄');
   };
 
-  const handleDeleteAsset = (id: string) => {
+  const handleDeleteAsset = (id) => {
     if (confirm('確定刪除此筆記錄？')) {
       // 如果正在編輯這筆，取消編輯狀態
       if (editingAssetId === id) {
@@ -371,7 +351,7 @@ export default function InvestmentTracker() {
     }
   };
 
-  const handleDeleteContribution = (id: string) => {
+  const handleDeleteContribution = (id) => {
     if (confirm('確定刪除此筆記錄？')) {
       setContributions(contributions.filter(c => c.id !== id));
     }
@@ -421,10 +401,10 @@ export default function InvestmentTracker() {
                   dataKey="value"
                 >
                   {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[entry.type as keyof typeof COLORS]} />
+                    <Cell key={`cell-${index}`} fill={COLORS[entry.type]} />
                   ))}
                 </Pie>
-                <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
+                <RechartsTooltip formatter={(value) => formatCurrency(value)} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -497,7 +477,7 @@ export default function InvestmentTracker() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="date" tick={{fontSize: 12}} tickFormatter={(tick) => tick.substring(5)} />
                 <YAxis width={80} tick={{fontSize: 12}} tickFormatter={(val) => `${(val/10000).toFixed(0)}萬`} />
-                <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
+                <RechartsTooltip formatter={(value) => formatCurrency(value)} />
                 <Legend />
                 {chartMode === 'total' ? (
                   <Line type="monotone" dataKey="total" name="總資產" stroke="#0f172a" strokeWidth={2} dot={{r: 4}} activeDot={{r: 6}} />
@@ -558,7 +538,7 @@ export default function InvestmentTracker() {
             <select 
               className="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
               value={newAsset.type}
-              onChange={e => setNewAsset({...newAsset, type: e.target.value as AssetType})}
+              onChange={e => setNewAsset({...newAsset, type: e.target.value})}
             >
               {Object.entries(ASSET_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>{label}</option>
@@ -694,7 +674,7 @@ export default function InvestmentTracker() {
             <select 
               className="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5"
               value={newContribution.person}
-              onChange={e => setNewContribution({...newContribution, person: e.target.value as 'A_Ru' | 'A_Hui'})}
+              onChange={e => setNewContribution({...newContribution, person: e.target.value})}
             >
               <option value="A_Ru">阿儒</option>
               <option value="A_Hui">阿慧</option>
